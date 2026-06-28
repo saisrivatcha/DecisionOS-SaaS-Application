@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import type { SharedDecision, DecisionDraft } from "../App";
+import { DEMO_SCENARIOS } from "../lib/mockScenarios";
 
 const contextColors: Record<string, { bg: string; color: string }> = {
   Renewal:    { bg: "#f0f0f8", color: "#4f46e5" },
@@ -17,13 +18,6 @@ const contextColors: Record<string, { bg: string; color: string }> = {
 const priorityLabel = (d: SharedDecision) => {
   if (d.status === "in-review") return { label: "In Review", color: "#4f46e5", bg: "#f0f0f8" };
   return { label: "New Submission", color: "#b45309", bg: "#fffbeb" };
-};
-
-const suggestedStrategies: Record<string, string[]> = {
-  Renewal:   ["Executive Business Review within 14 days", "Send renewal proposal with SLA upgrade", "Offer multi-year commitment with discount"],
-  Pricing:   ["Executive alignment call VP-to-VP", "Restructured tiered offer", "Hold position with ROI evidence"],
-  Complaint: ["Escalate to Customer Success Director", "Schedule emergency support call", "Provide interim workaround + timeline"],
-  Upsell:    ["Expansion proposal to requesting departments", "90-day pilot program", "Bundle with renewal at volume discount"],
 };
 
 interface PendingReviewsProps {
@@ -123,7 +117,9 @@ export function PendingReviews({ decisions, onApprove, onReject, onOpenWorkspace
         {expanded ? (() => {
           const dec = decisions.find((d) => d.id === expanded);
           if (!dec) return null;
-          const strategies = suggestedStrategies[dec.context] ?? ["Review and discuss with the team", "Escalate to senior leadership", "Request more information"];
+          
+          const scenario = DEMO_SCENARIOS.find(s => s.id === dec.scenarioId) ?? DEMO_SCENARIOS[0];
+          const strategies = scenario.strategies.map(s => s.title);
           const isApproved = approvedIds.includes(dec.id);
           const isRejecting = rejectingId === dec.id;
 
@@ -146,54 +142,63 @@ export function PendingReviews({ decisions, onApprove, onReject, onOpenWorkspace
               <div className="space-y-4 mb-6">
                 <AnalysisCard title="Business Summary">
                   <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>
-                    The contributor has captured a {dec.context.toLowerCase()} discussion involving {dec.customer}. The situation involves contract renewal pressure with competitive dynamics. Based on 12 similar past discussions, this requires a structured response within 14 days.
+                    {scenario.notes}
                   </p>
                 </AnalysisCard>
 
                 <AnalysisCard title="Possible Decision Identified">
                   <div className="rounded-xl p-4" style={{ background: "#f0f0f8", border: "1px solid #ddddf0" }}>
                     <p className="font-semibold" style={{ color: "#1a1a2e" }}>
-                      Immediate executive engagement required to prevent competitor evaluation from advancing.
+                      {scenario.strategies[0]?.description ?? "Immediate executive engagement required."}
                     </p>
                   </div>
                 </AnalysisCard>
 
                 <div className="grid grid-cols-2 gap-4">
                   <AnalysisCard title="Evidence Used">
-                    {["Meeting notes (uploaded)", "CRM history — 4 years", "12 similar past cases", "Customer health score: 72"].map((e) => (
+                    {scenario.evidence.slice(0, 4).map((e) => (
                       <div key={e} className="flex items-center gap-2 mb-1.5">
                         <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#059669" }} />
                         <span className="text-xs" style={{ color: "#374151" }}>{e}</span>
                       </div>
                     ))}
+                    {scenario.evidence.length === 0 && (
+                      <p className="text-xs" style={{ color: "#6b6b80" }}>No evidence explicitly attached.</p>
+                    )}
                   </AnalysisCard>
                   <AnalysisCard title="Missing Information">
-                    {["CFO budget authority limit", "Competitor evaluation stage", "Internal approval chain"].map((m) => (
+                    {scenario.questions.slice(0, 3).map((m) => (
                       <div key={m} className="flex items-center gap-2 mb-1.5">
                         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
                         <span className="text-xs" style={{ color: "#374151" }}>{m}</span>
                       </div>
                     ))}
+                    {scenario.questions.length === 0 && (
+                      <p className="text-xs" style={{ color: "#6b6b80" }}>No missing information detected.</p>
+                    )}
                   </AnalysisCard>
                 </div>
 
                 {/* Similar decisions */}
-                <AnalysisCard title="12 Similar Cases Found">
+                <AnalysisCard title={`${scenario.history.length > 0 ? scenario.history.length : '3'} Similar Cases Found`}>
                   <div className="space-y-2">
-                    {[
-                      { id: "D-2841", customer: "Acme Corp",     strategy: "Executive Business Review",  outcome: "+$245K renewed", success: true },
-                      { id: "D-2839", customer: "GlobalRetail",  strategy: "Renewal proposal + SLA",      outcome: "+$92K renewed",  success: true },
-                      { id: "D-2834", customer: "Horizon Logistics", strategy: "Training playbook",      outcome: "Churned −$78K",  success: false },
-                    ].map((c) => (
-                      <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.success ? "#059669" : "#dc2626" }} />
+                    {scenario.history.length > 0 ? scenario.history.map((c, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#059669" }} />
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium" style={{ color: "#1a1a2e" }}>{c.customer} — {c.strategy}</div>
+                          <div className="text-xs font-medium" style={{ color: "#1a1a2e" }}>{c.action}</div>
                         </div>
-                        <span className="text-xs font-semibold flex-shrink-0" style={{ color: c.success ? "#059669" : "#dc2626" }}>{c.outcome}</span>
+                        <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#059669" }}>{c.outcome}</span>
                       </div>
-                    ))}
-                    <p className="text-xs" style={{ color: "#a0a0b0" }}>+ 9 more similar cases in Company Memory</p>
+                    )) : (
+                      <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#059669" }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium" style={{ color: "#1a1a2e" }}>Standard Process Executed</div>
+                        </div>
+                        <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#059669" }}>Successful</span>
+                      </div>
+                    )}
                   </div>
                 </AnalysisCard>
               </div>
@@ -243,7 +248,7 @@ export function PendingReviews({ decisions, onApprove, onReject, onOpenWorkspace
                     <Button
                       variant="outline"
                       className="h-11"
-                      onClick={() => onOpenWorkspace({ entity: dec.customer, entityType: dec.context, notes: dec.summary, isNew: false })}
+                      onClick={() => onOpenWorkspace({ id: dec.id, entity: dec.customer, entityType: dec.context, notes: dec.summary, isNew: false, scenarioId: dec.scenarioId })}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>

@@ -3,10 +3,11 @@ import {
   Building2, FolderOpen, Truck, Users, Handshake,
   Upload, FileText, Mail, Database, Mic, FileImage,
   AlignLeft, Camera, CheckCircle, Loader, Sparkles,
-  ChevronRight, X, AlertTriangle,
+  ChevronRight, X, AlertTriangle, UploadCloud, BrainCircuit
 } from "lucide-react";
 import { Button } from "./ui/button";
 import type { DecisionDraft } from "../App";
+import { DEMO_SCENARIOS } from "../lib/mockScenarios";
 
 type EntityType = "Customer" | "Partner" | "Vendor" | "Internal Team" | "Project";
 type DecisionType = "Renewal" | "Pricing" | "Complaint" | "Upsell" | "Feature Request" | "Other";
@@ -65,9 +66,17 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
   const [decision, setDecision]       = useState("");
   const [priority, setPriority]       = useState<Priority>("Medium");
   const [revenue, setRevenue]         = useState("");
+  const [scenarioId, setScenarioId]   = useState<string | null>(null);
+  const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [stage, setStage]             = useState<"idle" | "processing" | "done">("idle");
   const [pipelineStep, setPipelineStep] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setStage("processing");
+  };
 
   /* Pipeline animation */
   useEffect(() => {
@@ -87,23 +96,31 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
         onSubmit({
           entity: entityName || entityType || "Unknown",
           entityType: decisionType ?? entityType ?? "Discussion",
-          notes: [summary, involved && `Involved: ${involved}`, decision && `Decision needed: ${decision}`].filter(Boolean).join("\n"),
+          notes: summary,
           isNew: true,
+          scenarioId: scenarioId ?? undefined,
         });
       }, 700);
       return () => clearTimeout(t);
     }
   }, [stage]);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    setFiles((p) => [...p, ...Array.from(e.dataTransfer.files)]);
-  };
-
   const canGoStep2 = !!entityType && entityName.trim().length > 0 && !!decisionType;
-  const canGoStep3 = files.length > 0 || freeText.trim().length > 10;
   const canSubmit  = summary.trim().length > 10;
+
+  const handleAutofill = (id: string) => {
+    if (!id) return;
+    const s = DEMO_SCENARIOS.find(x => x.id === id);
+    if (!s) return;
+    setScenarioId(s.id);
+    setEntityName(s.customer);
+    setEntityType("Customer");
+    setDecisionType(s.context as DecisionType);
+    setSummary(s.notes);
+    setPriority(s.priority);
+    setRevenue(s.revenue);
+    setStep(3);
+  };
 
   /* Processing screen */
   if (stage === "processing" || stage === "done") {
@@ -112,7 +129,7 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#f0f0f8" }}>
-              <Sparkles className="w-5 h-5" style={{ color: "#4f46e5" }} />
+              <BrainCircuit className="w-5 h-5" style={{ color: "#4f46e5" }} />
             </div>
             <h3 className="font-semibold mb-1" style={{ color: "#1a1a2e" }}>Submitting your business case</h3>
             <p className="text-sm" style={{ color: "#6b6b80" }}>{entityName} · {decisionType}</p>
@@ -134,7 +151,7 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
                   >
                     {isDone     ? <CheckCircle className="w-3.5 h-3.5 text-white" />
                     : isCurrent ? <Loader className="w-3 h-3 text-white animate-spin" />
-                    : null}
+                    : <UploadCloud className="w-3.5 h-3.5" style={{ color: "#a0a0b0" }} />}
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium" style={{ color: isDone ? "#374151" : isCurrent ? "#1a1a2e" : "#a0a0b0" }}>
@@ -149,11 +166,12 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
               );
             })}
           </div>
+
           {stage === "done" && (
-            <div className="mt-4 rounded-2xl p-4 text-center" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+            <div className="mt-8 rounded-2xl p-4 text-center animate-slide-up" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
               <CheckCircle className="w-5 h-5 mx-auto mb-2" style={{ color: "#059669" }} />
               <p className="text-sm font-medium" style={{ color: "#166534" }}>Submitted to James Chen</p>
-              <p className="text-xs mt-1" style={{ color: "#6b6b80" }}>Expected review within 24 hours</p>
+              <p className="text-xs mt-1" style={{ color: "#6b6b80" }}>Decision package has been routed</p>
             </div>
           )}
         </div>
@@ -186,7 +204,41 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
   );
 
   return (
-    <div className="flex items-center justify-center min-h-full p-8">
+    <div className="flex items-center justify-center min-h-full p-8 relative">
+      {/* Demo Autofill Header */}
+      <div className="absolute top-8 left-8 right-8 flex justify-end z-50">
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={() => setShowDemoMenu(!showDemoMenu)}
+            className="text-xl opacity-30 hover:opacity-100 cursor-pointer transition-opacity outline-none"
+            title="Autofill Demo Data"
+          >
+            ✨
+          </button>
+          {showDemoMenu && (
+            <div className="absolute top-full right-0 mt-2 bg-white border shadow-xl rounded-xl overflow-hidden py-2 w-72" style={{ borderColor: "#e8e8ed" }}>
+              <div className="px-4 py-2 text-xs font-bold text-gray-400 border-b mb-1" style={{ borderColor: "#f3f3f7" }}>
+                Select Hackathon Demo Data
+              </div>
+              {DEMO_SCENARIOS.map(s => (
+                <button 
+                  key={s.id}
+                  className="w-full text-left px-4 py-2 text-xs hover:bg-indigo-50 transition-colors"
+                  style={{ color: "#374151" }}
+                  onClick={() => {
+                    handleAutofill(s.id);
+                    setShowDemoMenu(false);
+                  }}
+                >
+                  {s.demoLabel}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="w-full max-w-xl">
         <StepBar />
 

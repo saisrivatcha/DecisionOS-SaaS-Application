@@ -60,5 +60,18 @@
     "localPath": "storage/meetings/demo-recording-1.mp4",
     "syncedAt": "2026-06-28T05:38:50.478Z",
     "hasTranscript": false
+  },
+  {
+    "id": "demo-recording-1782629183604",
+    "name": "Meeting recording — 28/6/2026, 12:16:23 pm",
+    "mimeType": "video/mp4",
+    "size": 1067506,
+    "modifiedTime": "2026-06-28T06:46:23.668Z",
+    "localPath": "storage\\meetings\\demo-recording-1782629183604.mp4",
+    "syncedAt": "2026-06-28T06:46:23.668Z",
+    "hasTranscript": true,
+    "transcriptPath": "storage\\meetings\\transcripts\\demo-recording-1782629183604.txt",
+    "transcriptPreview": "Live Meeting Transcript — 6/28/2026, 12:16:23 PM [12:16:08 PM] You: hello everyone [12:16:18 PM] You: hello everyone I am I would like to withdraw from your application because of price hiking",
+    "transcriptSource": "live"
   }
 ]

@@ -38,6 +38,7 @@ export interface User {
 }
 
 export interface DecisionDraft {
+  id?: string;
   entity: string;
   entityType: string;
   notes: string;
@@ -45,6 +46,7 @@ export interface DecisionDraft {
   // compat shim
   customer?: string;
   context?: string;
+  scenarioId?: string;
 }
 
 export interface SharedDecision {
@@ -60,6 +62,7 @@ export interface SharedDecision {
   rejectionNote?: string;
   approvedStrategy?: string;
   outcome?: string;
+  scenarioId?: string;
 }
 
 const INITIAL_DECISIONS: SharedDecision[] = [
@@ -149,6 +152,7 @@ export default function App() {
       revenue: "TBD",
       summary: d.notes.slice(0, 100) + (d.notes.length > 100 ? "…" : ""),
       priority: "Medium",
+      scenarioId: d.scenarioId,
     };
     setDecisions((prev) => [newDec, ...prev]);
     // After submitting, show them the status view immediately
@@ -197,6 +201,7 @@ export default function App() {
         <DecisionWorkspace
           draft={draft}
           onApprove={handleWorkspaceApprove}
+          onReject={handleReject}
           onNavigate={navigate}
           userRole="architect"
         />

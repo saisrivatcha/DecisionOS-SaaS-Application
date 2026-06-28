@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String     @id @default(uuid())
+  name      String
+  createdAt DateTime   @default(now())
+  users     User[]
+  decisions Decision[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  name           String
+  role           Role         @default(CONTRIBUTOR)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  decisions      Decision[]   @relation("SubmittedDecisions")
+  approvedDecisions Decision[] @relation("ApprovedDecisions")
+}
+
+model Decision {
+  id             String       @id @default(uuid())
+  customer       String
+  context        String
+  priority       String
+  status         DecisionStatus @default(DRAFT)
+  
+  // Relations
+  submitterId    String
+  submitter      User         @relation("SubmittedDecisions", fields: [submitterId], references: [id])
+  architectId    String?
+  architect      User?        @relation("ApprovedDecisions", fields: [architectId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  // Agent Output Data
+  aiConfidence   Float?
+  strategies     Strategy[]
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Strategy {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  probability Int
+  impact      String
+  risk        String
+  decisionId  String
+  decision    Decision @relation(fields: [decisionId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  ARCHITECT
+  CONTRIBUTOR
+}
+
+enum DecisionStatus {
+  DRAFT
+  SUBMITTED
+  ANALYSIS
+  REVIEW
+  APPROVED
+  EXECUTED
+}

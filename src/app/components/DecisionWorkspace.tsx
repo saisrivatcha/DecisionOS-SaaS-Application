@@ -1,56 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CheckCircle, XCircle, RefreshCw, ChevronRight,
   AlertTriangle, Info, ChevronDown, ChevronUp, ArrowRight,
+  Loader, Sparkles
 } from "lucide-react";
 import { Button } from "./ui/button";
 import type { DecisionDraft, Page } from "../App";
+import { DEMO_SCENARIOS } from "../lib/mockScenarios";
 
 const LIFECYCLE = ["Draft", "Submitted", "Analysis", "Review", "Approved", "Executed", "In Memory"] as const;
-
-interface Strategy {
-  id: string;
-  title: string;
-  description: string;
-  probability: number;
-  impact: string;
-  risk: "Low" | "Medium" | "High";
-  timeRequired: string;
-  resources: string;
-  recommended?: boolean;
-  accent: string;
-  bg: string;
-}
-
-function buildStrategies(context: string): Strategy[] {
-  if (context === "Pricing") {
-    return [
-      { id: "s1", title: "Executive Alignment", description: "Request a VP-to-VP call to reframe value and resolve the pricing concern at the right level.", probability: 74, impact: "Preserves full ARR and builds executive relationship", risk: "Medium", timeRequired: "7–10 days", resources: "VP Sales + Account Executive", recommended: true, accent: "#4f46e5", bg: "#f0f0f8" },
-      { id: "s2", title: "Restructured Offer", description: "Present a tiered package that reduces short-term cost while protecting long-term revenue.", probability: 61, impact: "10–15% discount, customer retained", risk: "Low", timeRequired: "3–5 days", resources: "Account Executive + Finance", accent: "#0284c7", bg: "#f0f9ff" },
-      { id: "s3", title: "Hold Position", description: "Maintain pricing, send ROI evidence report, and allow the customer to complete their evaluation.", probability: 38, impact: "Full ARR or potential churn", risk: "High", timeRequired: "14+ days", resources: "Account Executive only", accent: "#6b6b80", bg: "#f7f7f9" },
-    ];
-  }
-  if (context === "Upsell") {
-    return [
-      { id: "s1", title: "Expansion Proposal", description: "Present a formal expansion proposal to both requesting departments with a volume discount.", probability: 82, impact: "+$320K ARR potential", risk: "Low", timeRequired: "5–7 days", resources: "Account Executive + CS Manager", recommended: true, accent: "#059669", bg: "#f0fdf4" },
-      { id: "s2", title: "90-Day Pilot", description: "Start with one department on a pilot before expanding to both.", probability: 69, impact: "+$140K ARR short-term", risk: "Low", timeRequired: "14 days", resources: "CS Manager", accent: "#0284c7", bg: "#f0f9ff" },
-      { id: "s3", title: "Wait for QBR", description: "Address expansion during the upcoming Quarterly Business Review in 6 weeks.", probability: 45, impact: "Delayed revenue, risk of alternative tools", risk: "Medium", timeRequired: "6 weeks", resources: "None now", accent: "#6b6b80", bg: "#f7f7f9" },
-    ];
-  }
-  // Default: Renewal / Complaint / other
-  return [
-    { id: "s1", title: "Executive Business Review", description: "Schedule an EBR with VP-level stakeholders to realign on value, address concerns, and confirm next steps.", probability: 88, impact: "Highest renewal probability, executive alignment", risk: "Low", timeRequired: "7–14 days", resources: "VP Sales + Account Executive", recommended: true, accent: "#4f46e5", bg: "#f0f0f8" },
-    { id: "s2", title: "Renewal Incentive", description: "Offer a multi-year commitment with a modest discount and enhanced SLA guarantee.", probability: 71, impact: "Secures ARR with minor concession", risk: "Low", timeRequired: "3–5 days", resources: "Account Executive + Finance", accent: "#0284c7", bg: "#f0f9ff" },
-    { id: "s3", title: "Wait and Monitor", description: "Allow the evaluation to continue while maintaining regular touchpoints with the champion.", probability: 34, impact: "Risk of losing to competitor", risk: "High", timeRequired: "14+ days", resources: "Account Executive check-ins only", accent: "#6b6b80", bg: "#f7f7f9" },
-  ];
-}
 
 const riskColor = { Low: "#059669", Medium: "#b45309", High: "#dc2626" };
 const riskBg    = { Low: "#f0fdf4", Medium: "#fffbeb", High: "#fef2f2" };
 
 interface DecisionWorkspaceProps {
   draft: DecisionDraft | null;
-  onApprove: () => void;
+  onApprove: (id: string, strategy: string) => void;
+  onReject: (id: string, note: string) => void;
   onNavigate: (page: Page) => void;
   userRole?: "architect" | "contributor";
 }
@@ -60,17 +26,28 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
   const [selected, setSelected]     = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [approved, setApproved]     = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectNote, setRejectNote] = useState("");
   const [extra, setExtra]           = useState("");
 
-  const customer   = draft?.entity    ?? draft?.customer   ?? "Acme Corporation";
-  const context    = draft?.entityType ?? draft?.context  ?? "Renewal";
-  const notes      = draft?.notes    ?? "";
-  const strategies = buildStrategies(context);
+  const scenario = DEMO_SCENARIOS.find(s => s.id === (draft as any)?.scenarioId) ?? DEMO_SCENARIOS[0];
+  const customer   = scenario.customer;
+  const context    = scenario.context;
+  const notes      = scenario.notes;
+  const strategies = scenario.strategies;
 
   const handleApprove = () => {
     if (!selected) return;
     setApproved(true);
-    setTimeout(onApprove, 900);
+    setTimeout(() => {
+      onApprove(draft?.id ?? "", selected);
+      onNavigate(isArchitect ? "pending-reviews" : "my-submissions");
+    }, 1500);
+  };
+
+  const handleReject = () => {
+    onReject(draft?.id ?? "", rejectNote || "Needs more context before approval.");
+    onNavigate(isArchitect ? "pending-reviews" : "my-submissions");
   };
 
   if (approved) {
@@ -168,15 +145,16 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
           <div className="space-y-4 mb-8">
 
             {/* Customer overview */}
-            <Section title="Customer Overview">
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { label: "ARR",         value: "$245,000" },
-                  { label: "Contract End", value: "Aug 31, 2026" },
-                  { label: "Days Left",   value: "67 days" },
-                  { label: "NPS Score",   value: "48 (+18 vs Q1)" },
-                  { label: "Tier",        value: "Enterprise" },
-                  { label: "Customer Since", value: "March 2022" },
+            <div className="opacity-0 animate-slide-up stagger-1">
+              <Section title="Customer Overview">
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                  { label: "ARR",            value: scenario.stats.arr },
+                  { label: "Contract End",   value: scenario.stats.end },
+                  { label: "Days Left",      value: scenario.stats.days },
+                  { label: "NPS Score",      value: scenario.stats.nps },
+                  { label: "Tier",           value: scenario.stats.tier },
+                  { label: "Customer Since", value: scenario.stats.since },
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-xl p-3" style={{ background: "#f7f7f9" }}>
                     <div className="text-xs mb-0.5" style={{ color: "#a0a0b0" }}>{label}</div>
@@ -185,22 +163,22 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
                 ))}
               </div>
             </Section>
+            </div>
 
             {/* Situation summary */}
             {notes && (
-              <Section title="Situation Summary">
-                <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>{notes}</p>
-              </Section>
+              <div className="opacity-0 animate-slide-up stagger-2">
+                <Section title="Situation Summary">
+                  <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>{notes}</p>
+                </Section>
+              </div>
             )}
 
             {/* Stakeholders */}
-            <Section title="Stakeholders">
-              <div className="space-y-2">
-                {[
-                  { name: "Mike Torres", role: "VP of Engineering",  sentiment: "Champion",  color: "#059669", bg: "#f0fdf4" },
-                  { name: "Lisa Chen",   role: "CFO",                sentiment: "Skeptical", color: "#b45309", bg: "#fffbeb" },
-                  { name: "David Park",  role: "Procurement Manager", sentiment: "Neutral",   color: "#6b6b80", bg: "#f7f7f9" },
-                ].map(({ name, role, sentiment, color, bg }) => (
+            <div className="opacity-0 animate-slide-up stagger-3">
+              <Section title="Stakeholders">
+                <div className="space-y-2">
+                {scenario.stakeholders.length > 0 ? scenario.stakeholders.map(({ name, role, sentiment, color, bg }) => (
                   <div key={name} className="flex items-center justify-between p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <div className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0" style={{ background: "#e0e0f0", color: "#4f46e5" }}>
@@ -213,36 +191,35 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
                     </div>
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: bg, color }}>{sentiment}</span>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm" style={{ color: "#6b6b80" }}>No stakeholders explicitly identified in context.</p>
+                )}
               </div>
             </Section>
+            </div>
 
             {/* Current Risks */}
-            <Section title="Current Risks">
-              <div className="space-y-2">
-                {[
-                  { text: "CFO has not approved the renewal budget",            level: "High" as const },
-                  { text: "Active Salesforce evaluation — closes in 12 days",   level: "High" as const },
-                  { text: "No identified secondary champion",                    level: "Medium" as const },
-                  { text: "Budget cycle starts in 45 days",                     level: "Medium" as const },
-                ].map(({ text, level }) => (
+            <div className="opacity-0 animate-slide-up stagger-4">
+              <Section title="Current Risks">
+                <div className="space-y-2">
+                {scenario.risks.length > 0 ? scenario.risks.map(({ text, level }) => (
                   <div key={text} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: riskColor[level] }} />
                     <span className="text-sm flex-1" style={{ color: "#374151" }}>{text}</span>
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: riskBg[level], color: riskColor[level] }}>{level}</span>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm" style={{ color: "#6b6b80" }}>No major risks identified.</p>
+                )}
               </div>
             </Section>
+            </div>
 
-            {/* Previous decisions */}
-            <Section title="Previous Decisions">
-              <div className="space-y-2">
-                {[
-                  { date: "Mar 2026", action: "Sent ROI report after QBR concerns",         outcome: "Customer NPS rose 18 points" },
-                  { date: "Dec 2025", action: "Offered 90-day proof-of-concept extension",  outcome: "Converted to full contract" },
-                  { date: "Sep 2025", action: "Escalated to VP after support delays",       outcome: "Resolved — customer satisfied" },
-                ].map(({ date, action, outcome }) => (
+            {/* Previous Decisions & other info */}
+            <div className="opacity-0 animate-slide-up stagger-5">
+              <Section title="Previous Decisions">
+                <div className="space-y-2">
+                {scenario.history.length > 0 ? scenario.history.map(({ date, action, outcome }) => (
                   <div key={date} className="p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-xs font-medium" style={{ color: "#a0a0b0" }}>{date}</span>
@@ -251,42 +228,40 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
                     <div className="text-sm font-medium" style={{ color: "#1a1a2e" }}>{action}</div>
                     <div className="text-xs mt-0.5" style={{ color: "#6b6b80" }}>Outcome: {outcome}</div>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm" style={{ color: "#6b6b80" }}>No significant previous decisions recorded.</p>
+                )}
               </div>
             </Section>
 
             {/* Supporting evidence */}
             <Section title="Supporting Evidence">
-              {[
-                "CRM account history — 4 years, 98% on-time payments",
-                "May 2026 QBR transcript — champion expressed strong renewal intent",
-                "Q2 usage analytics — 94% platform adoption, above enterprise average",
-                "3 comparable accounts renewed when EBR was offered in similar window",
-              ].map((item, i) => (
+              {scenario.evidence.length > 0 ? scenario.evidence.map((item, i) => (
                 <div key={i} className="flex items-start gap-2.5 py-1.5">
                   <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#4f46e5" }} />
                   <span className="text-sm" style={{ color: "#374151" }}>{item}</span>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm" style={{ color: "#6b6b80" }}>No supporting evidence attached.</p>
+              )}
             </Section>
 
             {/* Open questions */}
             <Section title="Open Questions">
-              {[
-                "What is the CFO's exact budget authority limit?",
-                "What stage is the Salesforce evaluation at?",
-                "Who else has influence over the renewal decision?",
-              ].map((q, i) => (
+              {scenario.questions.length > 0 ? scenario.questions.map((q, i) => (
                 <div key={i} className="flex items-start gap-2.5 py-1.5">
                   <span className="text-xs font-semibold mt-0.5 flex-shrink-0" style={{ color: "#a0a0b0" }}>Q{i + 1}</span>
                   <span className="text-sm" style={{ color: "#374151" }}>{q}</span>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm" style={{ color: "#6b6b80" }}>No open questions identified.</p>
+              )}
             </Section>
+            </div>
           </div>
 
           {/* Suggested Strategies */}
-          <div className="mb-6">
+          <div className="mb-6 opacity-0 animate-slide-up stagger-5">
             <h2 className="font-semibold mb-1" style={{ color: "#1a1a2e" }}>Suggested Strategies</h2>
             <p className="text-sm mb-5" style={{ color: "#6b6b80" }}>
               Based on similar decisions in your company's history. Select one to approve.
@@ -454,7 +429,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
 
       {/* ── Right sidebar ── */}
       <div
-        className="w-68 flex-shrink-0 border-l overflow-y-auto p-5"
+        className="w-68 flex-shrink-0 border-l overflow-y-auto p-5 opacity-0 animate-fade-in stagger-5"
         style={{ width: 264, background: "#fff", borderColor: "#e8e8ed" }}
       >
         <h3 className="font-semibold mb-1" style={{ color: "#1a1a2e" }}>
@@ -486,23 +461,44 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
 
         <div className="space-y-2 mb-6">
           {isArchitect ? (
-            <>
-              <Button
-                className="w-full h-11 gap-2"
-                disabled={!selected}
-                onClick={handleApprove}
-                style={selected ? { background: "#1a1a2e", color: "#fff" } : {}}
-              >
-                <CheckCircle className="w-4 h-4" />
-                Approve & Record
-              </Button>
-              <Button variant="outline" className="w-full h-10 gap-2 text-sm">
-                <RefreshCw className="w-3.5 h-3.5" /> Request More Context
-              </Button>
-              <Button variant="outline" className="w-full h-10 gap-2 text-sm" style={{ color: "#dc2626", borderColor: "#fca5a5" }}>
-                <XCircle className="w-3.5 h-3.5" /> Reject
-              </Button>
-            </>
+            isRejecting ? (
+              <div className="rounded-2xl border p-5 mt-4" style={{ background: "#fff", borderColor: "#fca5a5" }}>
+                <h3 className="font-semibold mb-1" style={{ color: "#1a1a2e" }}>Reject with feedback</h3>
+                <p className="text-xs mb-3" style={{ color: "#a0a0b0" }}>The contributor will see this note and can resubmit.</p>
+                <textarea
+                  autoFocus
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none resize-none mb-3"
+                  style={{ borderColor: "#fca5a5", background: "#fff", color: "#374151", minHeight: 80 }}
+                  placeholder="Explain what additional information is needed…"
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button className="gap-2 h-10 flex-1 text-xs" style={{ background: "#dc2626", color: "#fff" }} onClick={handleReject}>
+                    <XCircle className="w-3.5 h-3.5" /> Confirm Rejection
+                  </Button>
+                  <Button variant="outline" className="h-10 text-xs" onClick={() => setIsRejecting(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Button
+                  className="w-full h-11 gap-2"
+                  disabled={!selected}
+                  onClick={handleApprove}
+                  style={selected ? { background: "#1a1a2e", color: "#fff" } : {}}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve & Record
+                </Button>
+                <Button variant="outline" className="w-full h-10 gap-2 text-sm">
+                  <RefreshCw className="w-3.5 h-3.5" /> Request More Context
+                </Button>
+                <Button variant="outline" className="w-full h-10 gap-2 text-sm" style={{ color: "#dc2626", borderColor: "#fca5a5" }} onClick={() => setIsRejecting(true)}>
+                  <XCircle className="w-3.5 h-3.5" /> Reject
+                </Button>
+              </>
+            )
           ) : (
             <>
               <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
@@ -527,7 +523,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
             { label: "Customer", value: customer },
             { label: "Context",  value: context },
             { label: "Created",  value: "Just now" },
-            { label: "Priority", value: "High" },
+            { label: "Priority", value: scenario.priority },
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between text-xs">
               <span style={{ color: "#a0a0b0" }}>{label}</span>
