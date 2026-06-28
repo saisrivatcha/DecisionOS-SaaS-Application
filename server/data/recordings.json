@@ -1,0 +1,64 @@
+[
+  {
+    "id": "demo-recording-1782623401483",
+    "name": "Meeting recording — 6/28/2026, 10:40:01 AM",
+    "mimeType": "video/mp4",
+    "size": 1275268,
+    "modifiedTime": "2026-06-28T05:10:01.502Z",
+    "localPath": "storage/meetings/demo-recording-1782623401483.mp4",
+    "syncedAt": "2026-06-28T05:10:01.502Z",
+    "hasTranscript": true,
+    "transcriptPath": "storage/meetings/transcripts/demo-recording-1782623401483.txt",
+    "transcriptPreview": "Live Meeting Transcript — 28/06/2026, 10:40:01 [10:39:47] You: hello [10:39:52] You: hello [10:39:55] You: kaise Laxman [10:39:59] You: thank you",
+    "transcriptSource": "live"
+  },
+  {
+    "id": "demo-recording-1782623807709",
+    "name": "Meeting recording — 6/28/2026, 10:46:47 AM",
+    "mimeType": "video/mp4",
+    "size": 1419499,
+    "modifiedTime": "2026-06-28T05:16:47.715Z",
+    "localPath": "storage/meetings/demo-recording-1782623807709.mp4",
+    "syncedAt": "2026-06-28T05:16:47.716Z",
+    "hasTranscript": true,
+    "transcriptPath": "storage/meetings/transcripts/demo-recording-1782623807709.txt",
+    "transcriptPreview": "Live Meeting Transcript — 28/06/2026, 10:46:47 [10:46:36] You: good morning everyone today we are going to discuss about [10:46:40] You: project thank you",
+    "transcriptSource": "live"
+  },
+  {
+    "id": "demo-recording-1782624141095",
+    "name": "Meeting recording — 6/28/2026, 10:52:21 AM",
+    "mimeType": "video/mp4",
+    "size": 1344563,
+    "modifiedTime": "2026-06-28T05:22:21.103Z",
+    "localPath": "storage/meetings/demo-recording-1782624141095.mp4",
+    "syncedAt": "2026-06-28T05:22:21.103Z",
+    "hasTranscript": true,
+    "transcriptPath": "storage/meetings/transcripts/demo-recording-1782624141095.txt",
+    "transcriptPreview": "Live Meeting Transcript — 28/06/2026, 10:52:21 [10:52:13] You: hi this is [10:52:19] You: come",
+    "transcriptSource": "live"
+  },
+  {
+    "id": "demo-recording-1782624988364",
+    "name": "Meeting recording — 6/28/2026, 11:06:28 AM",
+    "mimeType": "video/mp4",
+    "size": 1470755,
+    "modifiedTime": "2026-06-28T05:36:28.371Z",
+    "localPath": "storage/meetings/demo-recording-1782624988364.mp4",
+    "syncedAt": "2026-06-28T05:36:28.371Z",
+    "hasTranscript": true,
+    "transcriptPath": "storage/meetings/transcripts/demo-recording-1782624988364.txt",
+    "transcriptPreview": "Live Meeting Transcript — 28/06/2026, 11:06:28 [11:06:12] You: hi this is Kanth [11:06:15] You: hello everyone [11:06:21] You: I am here to present PPT",
+    "transcriptSource": "live"
+  },
+  {
+    "id": "demo-recording-1",
+    "name": "Demo Google Meet Recording",
+    "mimeType": "video/mp4",
+    "size": 1240000,
+    "modifiedTime": "2026-06-28T05:38:50.477Z",
+    "localPath": "storage/meetings/demo-recording-1.mp4",
+    "syncedAt": "2026-06-28T05:38:50.478Z",
+    "hasTranscript": false
+  }
+]

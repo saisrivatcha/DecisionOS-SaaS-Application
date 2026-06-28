@@ -1,0 +1,25 @@
+Meeting Transcript — Meeting recording — 6/28/2026, 10:16:42 AM
+Date: 6/28/2026, 10:16:42 AM
+
+James Chen (00:00:12):
+Thanks everyone for joining. Let's walk through the renewal strategy for Acme Corp and align on next steps.
+
+Sarah Lee (00:00:38):
+Procurement pushed back on the 15% price increase. They're actively evaluating Competitor X and want a response before Friday.
+
+James Chen (00:01:05):
+Understood. I recommend we schedule an executive business review within the next two weeks and lead with the ROI data from their last quarter.
+
+Tom Brown (00:01:42):
+I can pull usage analytics and the success metrics from the CS dashboard. Their adoption in Finance is strong — that's our best angle.
+
+Sarah Lee (00:02:18):
+Agreed. I'll draft the EBR invite today and loop in their VP of Operations. We should also prepare a bundled SLA upgrade option.
+
+James Chen (00:02:55):
+Good. Decision for today: proceed with EBR + ROI deck, hold on discounting until after the exec session. I'll capture this in DecisionOS.
+
+Action Items:
+• Sarah — Send EBR invite by EOD
+• Tom — Share Q2 usage report by tomorrow
+• James — Finalize renewal proposal draft by next Monday
