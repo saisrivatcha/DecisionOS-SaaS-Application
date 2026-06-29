@@ -3,10 +3,18 @@ import cookieSession from "cookie-session";
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import path from "path";
+
+// Load server/.env first, then root .env as fallback for any missing vars
+dotenv.config({ path: path.join(path.dirname(import.meta.url.replace('file:///', '')), '.env') });
+dotenv.config({ path: path.join(path.dirname(import.meta.url.replace('file:///', '')), '..', '.env') });
 import fs from "fs/promises";
 import { createWriteStream } from "fs";
 import { pipeline } from "stream/promises";
 import { fileURLToPath } from "url";
+import { processDecision } from "./services/decisionService.js";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 dotenv.config();
 
@@ -597,6 +605,107 @@ app.delete("/api/meetings/:id", async (req, res) => {
   } catch (error) {
     console.error("Meeting delete failed", error);
     res.status(500).json({ error: "Unable to delete meeting" });
+  }
+});
+
+// --- DECISIONS API (LangGraph & SQLite integration) ---
+
+app.get("/api/decisions", async (req, res) => {
+  try {
+    const decisions = await prisma.decision.findMany({
+      include: {
+        strategies: true,
+        submitter: true,
+        organization: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(decisions);
+  } catch (error) {
+    console.error("Failed to fetch decisions", error);
+    res.status(500).json({ error: "Failed to fetch decisions" });
+  }
+});
+
+// Single decision lookup (used by contributor polling)
+app.get("/api/decisions/:id", async (req, res) => {
+  try {
+    const decision = await prisma.decision.findUnique({
+      where: { id: req.params.id },
+      include: {
+        strategies: true,
+        submitter: true,
+        organization: true
+      }
+    });
+    if (!decision) {
+      return res.status(404).json({ error: "Decision not found" });
+    }
+    res.json(decision);
+  } catch (error) {
+    console.error("Failed to fetch decision", error);
+    res.status(500).json({ error: "Failed to fetch decision" });
+  }
+});
+
+app.post("/api/decisions", async (req, res) => {
+  try {
+    const inputData = req.body;
+    // Process via LangGraph
+    const result = await processDecision(inputData);
+    res.json(result.dbDecision);
+  } catch (error) {
+    console.error("Failed to process decision", error);
+    res.status(500).json({ error: "Failed to process decision", details: error.message });
+  }
+});
+
+app.put("/api/decisions/:id/approve", async (req, res) => {
+  try {
+    const { strategyId, feedback } = req.body;
+    const isRejection = !!feedback;
+
+    // Ensure architect user exists for demo
+    await prisma.user.upsert({
+      where: { id: "user-architect-1" },
+      update: {},
+      create: {
+        id: "user-architect-1",
+        email: "james@acme.com",
+        name: "James Chen",
+        role: "ARCHITECT",
+        organizationId: "org-demo-1"
+      }
+    });
+
+    const decision = await prisma.decision.upsert({
+      where: { id: req.params.id },
+      update: {
+        status: isRejection ? "REJECTED" : "APPROVED",
+        architectId: "user-architect-1",
+        approvedStrategy: !isRejection ? strategyId : null,
+      },
+      create: {
+        id: req.params.id,
+        customer: "Legacy Decision",
+        context: "Unknown",
+        priority: "Medium",
+        status: isRejection ? "REJECTED" : "APPROVED",
+        architectId: "user-architect-1",
+        approvedStrategy: !isRejection ? strategyId : null,
+        organizationId: "org-demo-1",
+        submitterId: "user-demo-1",
+      },
+      include: {
+        strategies: true,
+        submitter: true,
+        organization: true
+      }
+    });
+    res.json(decision);
+  } catch (error) {
+    console.error("Failed to approve/reject decision", error);
+    res.status(500).json({ error: "Failed to update decision" });
   }
 });
 

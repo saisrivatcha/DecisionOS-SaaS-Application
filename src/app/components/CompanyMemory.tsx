@@ -81,19 +81,41 @@ export function CompanyMemory({ decisions: _approved, onNavigate }: CompanyMemor
   const doSearch = (q: string) => {
     setQuery(q);
     setHasSearched(true);
-    if (!selected) setSelected(fullRecords[0].id);
+    if (!selected && combinedRecords.length > 0) setSelected(combinedRecords[0].id);
   };
 
+  const combinedRecords = [
+    ..._approved.map(d => ({
+      id: d.id,
+      customer: d.customer,
+      context: d.context,
+      date: d.date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      revenue: d.revenue.includes("$") && !d.revenue.startsWith("+") && !d.revenue.startsWith("-") ? `+${d.revenue}` : d.revenue,
+      department: "Sales",
+      submittedBy: d.submittedBy,
+      problem: d.summary,
+      decision: d.approvedStrategy || "Strategy approved",
+      reason: "Strategy recommended by AI agent and approved by Decision Architect.",
+      outcome: "Implementation in progress",
+      lessons: "Pending execution review",
+      participants: [`${d.submittedBy} (Submitter)`, "James Chen (Architect)"],
+      tags: [d.context.toLowerCase(), "live"],
+      aiSummary: "Recently approved live decision. Awaiting long term execution metrics.",
+      relatedIds: []
+    })),
+    ...fullRecords
+  ];
+
   const filtered = hasSearched
-    ? fullRecords.filter((r) => {
+    ? combinedRecords.filter((r) => {
         const q = query.toLowerCase();
         return !q || r.customer.toLowerCase().includes(q) || r.problem.toLowerCase().includes(q) ||
           r.decision.toLowerCase().includes(q) || r.tags.some((t) => t.includes(q)) ||
           r.context.toLowerCase().includes(q) || r.outcome.toLowerCase().includes(q);
       })
-    : fullRecords;
+    : combinedRecords;
 
-  const selectedRecord = fullRecords.find((r) => r.id === selected);
+  const selectedRecord = combinedRecords.find((r) => r.id === selected);
 
   return (
     <div className="flex h-full">
@@ -105,7 +127,7 @@ export function CompanyMemory({ decisions: _approved, onNavigate }: CompanyMemor
           <div className="mb-3">
             <h2 className="font-semibold" style={{ color: "#1a1a2e" }}>Company Memory</h2>
             <p className="text-xs mt-0.5" style={{ color: "#a0a0b0" }}>
-              {fullRecords.length} decisions · {fullRecords.filter((r) => r.outcome.includes("+")).length} successful · Search anything
+              {combinedRecords.length} decisions · {combinedRecords.filter((r) => r.outcome.includes("+") || r.revenue.startsWith("+")).length} successful · Search anything
             </p>
           </div>
 
@@ -292,7 +314,7 @@ export function CompanyMemory({ decisions: _approved, onNavigate }: CompanyMemor
                 <div className="rounded-2xl border p-5" style={{ background: "#fff", borderColor: "#e8e8ed" }}>
                   <h4 className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#a0a0b0" }}>Related Decisions</h4>
                   {selectedRecord.relatedIds.map((rid) => {
-                    const rel = fullRecords.find((r) => r.id === rid);
+                    const rel = combinedRecords.find((r) => r.id === rid);
                     if (!rel) return null;
                     return (
                       <button key={rid} onClick={() => setSelected(rid)} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 text-left" style={{ background: "#f7f7f9" }}>

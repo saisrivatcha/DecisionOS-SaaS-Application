@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   CheckCircle, Clock, XCircle, AlertCircle, ChevronRight,
   FileText, Mail, Database, Mic, User, ArrowLeft,
@@ -48,7 +49,46 @@ interface ContributorSubmissionViewProps {
 }
 
 export function ContributorSubmissionView({ decision, onNavigate }: ContributorSubmissionViewProps) {
-  if (!decision) {
+  const [liveDecision, setLiveDecision] = useState<SharedDecision | null>(decision);
+
+  // Update liveDecision when the prop changes
+  useEffect(() => {
+    if (decision) setLiveDecision(decision);
+  }, [decision]);
+
+  // Poll for status updates when decision is pending
+  useEffect(() => {
+    if (!decision?.id) return;
+    const status = liveDecision?.status;
+    // Only poll if the decision is still pending
+    if (status === 'approved' || status === 'rejected') return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/decisions/${decision.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const mappedStatus = data.status?.toLowerCase() === 'pending_review' ? 'in-review'
+          : data.status?.toLowerCase() === 'approved' ? 'approved'
+          : data.status?.toLowerCase() === 'rejected' ? 'rejected'
+          : data.status?.toLowerCase() || 'submitted';
+
+        setLiveDecision(prev => prev ? {
+          ...prev,
+          status: mappedStatus as any,
+          approvedStrategy: data.approvedStrategy || prev.approvedStrategy,
+        } : prev);
+      } catch { /* ignore polling errors */ }
+    };
+
+    const interval = setInterval(poll, 8000);
+    return () => clearInterval(interval);
+  }, [decision?.id, liveDecision?.status]);
+
+  // Use liveDecision for rendering
+  const d = liveDecision;
+
+  if (!d) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <AlertCircle className="w-10 h-10 mb-3" style={{ color: "#d1d1db" }} />
@@ -60,12 +100,12 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
     );
   }
 
-  const lifecycleStep = getLifecycleStep(decision.status);
-  const sd = statusDisplay[decision.status] ?? statusDisplay["submitted"];
+  const lifecycleStep = getLifecycleStep(d.status);
+  const sd = statusDisplay[d.status] ?? statusDisplay["submitted"];
   const StatusIcon = sd.icon;
-  const cc = contextColors[decision.context] ?? contextColors.Discussion;
-  const isApproved = decision.status === "approved";
-  const isRejected = decision.status === "rejected";
+  const cc = contextColors[d.context] ?? contextColors.Discussion;
+  const isApproved = d.status === "approved";
+  const isRejected = d.status === "rejected";
 
   return (
     <div className="flex h-full">
@@ -83,14 +123,14 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
           >
             <ArrowLeft className="w-3.5 h-3.5" /> My Decisions
           </button>
-          <span className="text-xs font-mono" style={{ color: "#a0a0b0" }}>{decision.id}</span>
-          <h2 className="font-semibold mt-1 mb-2" style={{ color: "#1a1a2e" }}>{decision.customer}</h2>
+          <span className="text-xs font-mono" style={{ color: "#a0a0b0" }}>{d.id}</span>
+          <h2 className="font-semibold mt-1 mb-2" style={{ color: "#1a1a2e" }}>{d.customer}</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: cc.bg, color: cc.color }}>
-              {decision.context}
+              {d.context}
             </span>
-            {decision.revenue !== "TBD" && (
-              <span className="text-xs font-semibold" style={{ color: "#374151" }}>{decision.revenue}</span>
+            {d.revenue !== "TBD" && (
+              <span className="text-xs font-semibold" style={{ color: "#374151" }}>{d.revenue}</span>
             )}
           </div>
         </div>
@@ -108,7 +148,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
             <div>
               <p className="font-semibold text-sm" style={{ color: sd.color }}>{sd.label}</p>
               <p className="text-xs mt-0.5" style={{ color: "#6b6b80" }}>
-                {decision.date === "Just now" ? "Submitted just now" : `Submitted ${decision.date}`}
+                {d.date === "Just now" ? "Submitted just now" : `Submitted ${d.date}`}
               </p>
             </div>
           </div>
@@ -121,8 +161,8 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
           </p>
           <div className="space-y-3">
             {LIFECYCLE.map((stage, i) => {
-              const isDone    = i <= lifecycleStep && decision.status !== "rejected";
-              const isCurrent = i === lifecycleStep + (decision.status === "in-review" ? 0 : 0);
+              const isDone    = i <= lifecycleStep && d.status !== "rejected";
+              const isCurrent = i === lifecycleStep + (d.status === "in-review" ? 0 : 0);
               const isRejectedHere = isRejected && i === 2;
               const StageIcon = stage.icon;
 
@@ -206,12 +246,12 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-3.5 h-3.5" style={{ color: "#a0a0b0" }} />
-              <span className="text-xs" style={{ color: "#a0a0b0" }}>Submitted {decision.date}</span>
+              <span className="text-xs" style={{ color: "#a0a0b0" }}>Submitted {d.date}</span>
             </div>
             <h1 className="text-xl font-semibold" style={{ color: "#1a1a2e" }}>
-              {decision.customer}
+              {d.customer}
             </h1>
-            <p className="text-sm mt-1" style={{ color: "#6b6b80" }}>{decision.context} Discussion</p>
+            <p className="text-sm mt-1" style={{ color: "#6b6b80" }}>{d.context} Discussion</p>
           </div>
 
           {/* Submitted Information */}
@@ -242,7 +282,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
               Business Summary
             </h3>
             <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>
-              {decision.summary}
+              {d.summary}
             </p>
           </div>
 
@@ -251,7 +291,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
             <h3 className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#a0a0b0" }}>
               Architect Comments
             </h3>
-            {isRejected && decision.rejectionNote ? (
+            {isRejected && d.rejectionNote ? (
               <div className="rounded-xl p-3.5" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
                 <div className="flex items-center gap-2 mb-1.5">
                   <XCircle className="w-4 h-4" style={{ color: "#dc2626" }} />
@@ -259,7 +299,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
                     Additional Information Required
                   </span>
                 </div>
-                <p className="text-sm" style={{ color: "#991b1b" }}>{decision.rejectionNote}</p>
+                <p className="text-sm" style={{ color: "#991b1b" }}>{d.rejectionNote}</p>
               </div>
             ) : isApproved ? (
               <div className="rounded-xl p-3.5" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
@@ -279,7 +319,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
           </div>
 
           {/* Final Decision — only shown after approval */}
-          {isApproved && decision.approvedStrategy && (
+          {isApproved && d.approvedStrategy && (
             <div
               className="rounded-2xl border p-5"
               style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}
@@ -295,7 +335,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
                   </p>
                   <div className="rounded-xl p-3.5" style={{ background: "#fff" }}>
                     <p className="font-semibold text-sm" style={{ color: "#1a1a2e" }}>
-                      {decision.approvedStrategy}
+                      {d.approvedStrategy}
                     </p>
                   </div>
                 </div>
@@ -307,7 +347,7 @@ export function ContributorSubmissionView({ decision, onNavigate }: ContributorS
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "#a0a0b0" }}>Approved Time</p>
-                    <p className="text-sm font-medium" style={{ color: "#1a1a2e" }}>{decision.date}</p>
+                    <p className="text-sm font-medium" style={{ color: "#1a1a2e" }}>{d.date}</p>
                   </div>
                 </div>
                 <div>

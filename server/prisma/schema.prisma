@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Organization {
@@ -19,7 +19,7 @@ model User {
   id             String       @id @default(uuid())
   email          String       @unique
   name           String
-  role           Role         @default(CONTRIBUTOR)
+  role           String       @default("CONTRIBUTOR")
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   decisions      Decision[]   @relation("SubmittedDecisions")
@@ -31,7 +31,8 @@ model Decision {
   customer       String
   context        String
   priority       String
-  status         DecisionStatus @default(DRAFT)
+  status         String @default("DRAFT")
+  approvedStrategy String?
   
   // Relations
   submitterId    String
@@ -60,17 +61,4 @@ model Strategy {
   decision    Decision @relation(fields: [decisionId], references: [id])
 }
 
-enum Role {
-  ADMIN
-  ARCHITECT
-  CONTRIBUTOR
-}
 
-enum DecisionStatus {
-  DRAFT
-  SUBMITTED
-  ANALYSIS
-  REVIEW
-  APPROVED
-  EXECUTED
-}

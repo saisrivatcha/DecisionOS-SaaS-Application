@@ -10,8 +10,8 @@ import { DEMO_SCENARIOS } from "../lib/mockScenarios";
 
 const LIFECYCLE = ["Draft", "Submitted", "Analysis", "Review", "Approved", "Executed", "In Memory"] as const;
 
-const riskColor = { Low: "#059669", Medium: "#b45309", High: "#dc2626" };
-const riskBg    = { Low: "#f0fdf4", Medium: "#fffbeb", High: "#fef2f2" };
+const riskColor: Record<string, string> = { Low: "#059669", Medium: "#b45309", High: "#dc2626" };
+const riskBg: Record<string, string>    = { Low: "#f0fdf4", Medium: "#fffbeb", High: "#fef2f2" };
 
 interface DecisionWorkspaceProps {
   draft: DecisionDraft | null;
@@ -21,7 +21,19 @@ interface DecisionWorkspaceProps {
   userRole?: "architect" | "contributor";
 }
 
-export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "architect" }: DecisionWorkspaceProps) {
+// Default scenario data when no matching demo scenario is found
+const DEFAULT_SCENARIO = {
+  stats: { arr: "TBD", end: "TBD", days: "TBD", nps: "N/A", tier: "Standard", since: "New" },
+  stakeholders: [] as Array<{ name: string; role: string; sentiment: string; color: string; bg: string }>,
+  risks: [] as Array<{ text: string; level: "High" | "Medium" | "Low" }>,
+  history: [] as Array<{ date: string; action: string; outcome: string }>,
+  evidence: [] as string[],
+  questions: [] as string[],
+  strategies: [] as any[],
+  priority: "Medium" as string,
+};
+
+export function DecisionWorkspace({ draft, onApprove, onReject, onNavigate, userRole = "architect" }: DecisionWorkspaceProps) {
   const isArchitect = userRole === "architect";
   const [selected, setSelected]     = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -30,24 +42,48 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
   const [rejectNote, setRejectNote] = useState("");
   const [extra, setExtra]           = useState("");
 
-  const scenario = DEMO_SCENARIOS.find(s => s.id === (draft as any)?.scenarioId) ?? DEMO_SCENARIOS[0];
-  const customer   = scenario.customer;
-  const context    = scenario.context;
-  const notes      = scenario.notes;
-  const strategies = scenario.strategies;
+  const customer   = (draft as any)?.customer || (draft as any)?.entity || "Unknown Customer";
+  const context    = (draft as any)?.context || (draft as any)?.entityType || "Discussion";
+  const notes      = (draft as any)?.summary || (draft as any)?.notes || "No notes provided.";
+
+  // Try to find a matching demo scenario for rich data, otherwise use defaults
+  const scenarioId = (draft as any)?.scenarioId;
+  const matchedScenario = scenarioId
+    ? DEMO_SCENARIOS.find(s => s.id === scenarioId)
+    : DEMO_SCENARIOS.find(s => s.customer.toLowerCase() === customer.toLowerCase());
+
+  const scenario = matchedScenario || DEFAULT_SCENARIO;
+
+  // Use strategies from the draft (DB data) if available, fall back to scenario
+  const strategies = ((draft as any)?.strategies && (draft as any).strategies.length > 0)
+    ? (draft as any).strategies.map((s: any, i: number) => ({
+        id: s.id || `strat-${i}`,
+        title: s.title,
+        description: s.description,
+        probability: s.probability || 50,
+        impact: s.impact || "Medium",
+        risk: s.risk || "Medium",
+        timeRequired: s.timeRequired || "TBD",
+        resources: s.resources || "TBD",
+        recommended: i === 0,
+        accent: s.accent || (i === 0 ? "#4f46e5" : i === 1 ? "#0284c7" : "#6b6b80"),
+        bg: s.bg || (i === 0 ? "#f0f0f8" : i === 1 ? "#f0f9ff" : "#f7f7f9"),
+      }))
+    : scenario.strategies;
 
   const handleApprove = () => {
     if (!selected) return;
+    const selectedStrat = strategies.find((s: any) => s.id === selected);
     setApproved(true);
     setTimeout(() => {
-      onApprove(draft?.id ?? "", selected);
-      onNavigate(isArchitect ? "pending-reviews" : "my-submissions");
+      onApprove(draft?.id ?? "", selectedStrat?.title || selected);
+      onNavigate(isArchitect ? "pending-reviews" : "my-decisions");
     }, 1500);
   };
 
   const handleReject = () => {
     onReject(draft?.id ?? "", rejectNote || "Needs more context before approval.");
-    onNavigate(isArchitect ? "pending-reviews" : "my-submissions");
+    onNavigate(isArchitect ? "pending-reviews" : "my-decisions");
   };
 
   if (approved) {
@@ -71,8 +107,8 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
         <div className="p-8 max-w-2xl">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-xs mb-6" style={{ color: "#a0a0b0" }}>
-            <button onClick={() => onNavigate(isArchitect ? "pending-reviews" : "my-submissions")} className="hover:underline">
-              {isArchitect ? "Pending Reviews" : "My Submissions"}
+            <button onClick={() => onNavigate(isArchitect ? "pending-reviews" : "my-decisions")} className="hover:underline">
+              {isArchitect ? "Pending Reviews" : "My Decisions"}
             </button>
             <ChevronRight className="w-3 h-3" />
             <span style={{ color: "#1a1a2e" }}>{customer} — {context}</span>
@@ -178,7 +214,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
             <div className="opacity-0 animate-slide-up stagger-3">
               <Section title="Stakeholders">
                 <div className="space-y-2">
-                {scenario.stakeholders.length > 0 ? scenario.stakeholders.map(({ name, role, sentiment, color, bg }) => (
+                {scenario.stakeholders.length > 0 ? scenario.stakeholders.map(({ name, role, sentiment, color, bg }: any) => (
                   <div key={name} className="flex items-center justify-between p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <div className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0" style={{ background: "#e0e0f0", color: "#4f46e5" }}>
@@ -202,7 +238,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
             <div className="opacity-0 animate-slide-up stagger-4">
               <Section title="Current Risks">
                 <div className="space-y-2">
-                {scenario.risks.length > 0 ? scenario.risks.map(({ text, level }) => (
+                {scenario.risks.length > 0 ? scenario.risks.map(({ text, level }: any) => (
                   <div key={text} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: riskColor[level] }} />
                     <span className="text-sm flex-1" style={{ color: "#374151" }}>{text}</span>
@@ -219,7 +255,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
             <div className="opacity-0 animate-slide-up stagger-5">
               <Section title="Previous Decisions">
                 <div className="space-y-2">
-                {scenario.history.length > 0 ? scenario.history.map(({ date, action, outcome }) => (
+                {scenario.history.length > 0 ? scenario.history.map(({ date, action, outcome }: any) => (
                   <div key={date} className="p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-xs font-medium" style={{ color: "#a0a0b0" }}>{date}</span>
@@ -236,7 +272,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
 
             {/* Supporting evidence */}
             <Section title="Supporting Evidence">
-              {scenario.evidence.length > 0 ? scenario.evidence.map((item, i) => (
+              {scenario.evidence.length > 0 ? scenario.evidence.map((item: string, i: number) => (
                 <div key={i} className="flex items-start gap-2.5 py-1.5">
                   <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: "#4f46e5" }} />
                   <span className="text-sm" style={{ color: "#374151" }}>{item}</span>
@@ -248,7 +284,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
 
             {/* Open questions */}
             <Section title="Open Questions">
-              {scenario.questions.length > 0 ? scenario.questions.map((q, i) => (
+              {scenario.questions.length > 0 ? scenario.questions.map((q: string, i: number) => (
                 <div key={i} className="flex items-start gap-2.5 py-1.5">
                   <span className="text-xs font-semibold mt-0.5 flex-shrink-0" style={{ color: "#a0a0b0" }}>Q{i + 1}</span>
                   <span className="text-sm" style={{ color: "#374151" }}>{q}</span>
@@ -267,21 +303,23 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
               Based on similar decisions in your company's history. Select one to approve.
             </p>
             <div className="space-y-3">
-              {strategies.map((s) => {
+              {strategies.length > 0 ? strategies.map((s: any) => {
                 const isSelected = selected === s.id;
+                const accentColor = s.accent || "#4f46e5";
+                const bgColor = s.bg || "#f0f0f8";
                 return (
                   <button
                     key={s.id}
                     onClick={() => setSelected(isSelected ? null : s.id)}
                     className="w-full text-left rounded-2xl border-2 p-5 transition-all"
-                    style={{ borderColor: isSelected ? s.accent : "#e8e8ed", background: isSelected ? s.bg : "#fff" }}
+                    style={{ borderColor: isSelected ? accentColor : "#e8e8ed", background: isSelected ? bgColor : "#fff" }}
                   >
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold" style={{ color: "#1a1a2e" }}>{s.title}</h3>
                           {s.recommended && (
-                            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: s.bg, color: s.accent }}>
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: bgColor, color: accentColor }}>
                               Recommended
                             </span>
                           )}
@@ -289,16 +327,16 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
                         <p className="text-sm leading-relaxed" style={{ color: "#6b6b80" }}>{s.description}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <div className="text-2xl font-bold" style={{ color: s.accent }}>{s.probability}%</div>
+                        <div className="text-2xl font-bold" style={{ color: accentColor }}>{s.probability}%</div>
                         <div className="text-xs" style={{ color: "#a0a0b0" }}>success probability</div>
                       </div>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
                       {[
-                        { label: "Risk",      value: s.risk,         color: riskColor[s.risk], bg: riskBg[s.risk] },
+                        { label: "Risk",      value: s.risk,         color: riskColor[s.risk] || "#374151", bg: riskBg[s.risk] || "#f7f7f9" },
                         { label: "Impact",    value: s.impact,       color: "#374151", bg: "#f7f7f9" },
-                        { label: "Timeline",  value: s.timeRequired, color: "#374151", bg: "#f7f7f9" },
-                        { label: "Resources", value: s.resources,    color: "#374151", bg: "#f7f7f9" },
+                        { label: "Timeline",  value: s.timeRequired || "TBD", color: "#374151", bg: "#f7f7f9" },
+                        { label: "Resources", value: s.resources || "TBD",    color: "#374151", bg: "#f7f7f9" },
                       ].map(({ label, value, color, bg }) => (
                         <div key={label} className="rounded-xl p-2.5" style={{ background: bg }}>
                           <div className="text-xs mb-0.5" style={{ color: "#a0a0b0" }}>{label}</div>
@@ -308,7 +346,12 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
                     </div>
                   </button>
                 );
-              })}
+              }) : (
+                <div className="rounded-2xl border p-5 text-center" style={{ background: "#f7f7f9", borderColor: "#e8e8ed" }}>
+                  <Loader className="w-5 h-5 mx-auto mb-2 animate-spin" style={{ color: "#4f46e5" }} />
+                  <p className="text-sm" style={{ color: "#6b6b80" }}>No strategies generated yet.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -444,12 +487,15 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
         {/* Selected preview */}
         {selected ? (
           (() => {
-            const s = strategies.find((x) => x.id === selected)!;
+            const s = strategies.find((x: any) => x.id === selected);
+            if (!s) return null;
+            const accentColor = s.accent || "#4f46e5";
+            const bgColor = s.bg || "#f0f0f8";
             return (
-              <div className="rounded-xl p-4 mb-4" style={{ background: s.bg, border: `1px solid ${s.accent}33` }}>
+              <div className="rounded-xl p-4 mb-4" style={{ background: bgColor, border: `1px solid ${accentColor}33` }}>
                 <div className="text-xs mb-0.5" style={{ color: "#a0a0b0" }}>Selected</div>
                 <div className="font-semibold text-sm" style={{ color: "#1a1a2e" }}>{s.title}</div>
-                <div className="text-xs mt-1 font-medium" style={{ color: s.accent }}>{s.probability}% success probability</div>
+                <div className="text-xs mt-1 font-medium" style={{ color: accentColor }}>{s.probability}% success probability</div>
               </div>
             );
           })()
@@ -509,9 +555,9 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
               <Button
                 variant="outline"
                 className="w-full h-10 gap-2 text-sm"
-                onClick={() => onNavigate("my-submissions")}
+                onClick={() => onNavigate("my-decisions")}
               >
-                Back to My Submissions
+                Back to My Decisions
               </Button>
             </>
           )}
@@ -523,7 +569,7 @@ export function DecisionWorkspace({ draft, onApprove, onNavigate, userRole = "ar
             { label: "Customer", value: customer },
             { label: "Context",  value: context },
             { label: "Created",  value: "Just now" },
-            { label: "Priority", value: scenario.priority },
+            { label: "Priority", value: scenario.priority || "Medium" },
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between text-xs">
               <span style={{ color: "#a0a0b0" }}>{label}</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { LoginPage } from "./components/LoginPage";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
@@ -102,6 +102,52 @@ export default function App() {
   const [decisions, setDecisions]         = useState<SharedDecision[]>(INITIAL_DECISIONS);
   const [activeDecisionId, setActiveDecisionId] = useState<string | null>(null);
 
+  const mapApiDecision = (d: any): SharedDecision => ({
+    id: d.id,
+    customer: d.customer || d.organization?.name || "Unknown",
+    context: d.context?.length > 20 ? d.context.slice(0, 20) + "..." : d.context || "Discussion",
+    submittedBy: d.submitter?.name || "Demo User",
+    status: d.status?.toLowerCase() === 'pending_review' ? 'in-review'
+          : d.status?.toLowerCase() === 'approved' ? 'approved'
+          : d.status?.toLowerCase() === 'rejected' ? 'rejected'
+          : d.status?.toLowerCase() || 'submitted',
+    date: new Date(d.createdAt).toLocaleDateString(),
+    revenue: "TBD",
+    summary: d.context?.slice(0, 100) || "",
+    priority: (d.priority || "Medium") as any,
+    scenarioId: d.id,
+    // @ts-ignore pass strategies so workspace can render them
+    strategies: d.strategies
+  });
+
+  const fetchDecisions = useCallback(() => {
+    fetch('/api/decisions')
+      .then(res => res.json())
+      .then(data => {
+        if(Array.isArray(data) && data.length > 0) {
+           const mapped = data.map(mapApiDecision);
+           setDecisions(prev => {
+             // Merge: API decisions first, then keep initial decisions that aren't in API
+             const apiIds = new Set(mapped.map((d: SharedDecision) => d.id));
+             const kept = prev.filter(d => !apiIds.has(d.id) && !d.id.startsWith('D-'));
+             return [...mapped, ...INITIAL_DECISIONS.filter(d => !apiIds.has(d.id))];
+           });
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    fetchDecisions();
+  }, [fetchDecisions]);
+
+  // Poll for status updates every 10 seconds when contributor is viewing their submissions
+  useEffect(() => {
+    if (!user || user.role === 'architect') return;
+    const interval = setInterval(fetchDecisions, 10000);
+    return () => clearInterval(interval);
+  }, [user, fetchDecisions]);
+
   const navigate = (p: Page) => {
     setPage(p);
     const params = new URLSearchParams(window.location.search);
@@ -112,28 +158,53 @@ export default function App() {
     window.history.replaceState({}, document.title, `/?${params.toString()}`);
   };
 
-  /* Architect opens full AI review workspace */
   const openWorkspace = (d: DecisionDraft) => {
-    setDraft(d);
+    // If opening from a decision that has strategies, attach them to the draft
+    const matchingDecision = decisions.find(dec => dec.id === d.id);
+    const enrichedDraft = {
+      ...d,
+      customer: d.entity || (matchingDecision as any)?.customer,
+      context: d.entityType || (matchingDecision as any)?.context,
+      summary: d.notes || (matchingDecision as any)?.summary,
+      strategies: (matchingDecision as any)?.strategies || (d as any)?.strategies || [],
+    };
+    setDraft(enrichedDraft);
     setPage("workspace");
   };
 
-  /* Contributor opens their status-tracking view (NO AI shown) */
   const openSubmissionView = (id: string) => {
     setActiveDecisionId(id);
     setPage("submission-view");
   };
 
-  const handleApprove = (id: string, strategy: string) => {
-    setDecisions((prev) =>
-      prev.map((d) => d.id === id ? { ...d, status: "approved", approvedStrategy: strategy } : d)
-    );
+  const handleApprove = async (id: string, strategy: string) => {
+    try {
+      await fetch(`/api/decisions/${id}/approve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strategyId: strategy })
+      });
+      setDecisions((prev) =>
+        prev.map((d) => d.id === id ? { ...d, status: "approved", approvedStrategy: strategy } : d)
+      );
+      // Refetch to ensure consistency
+      setTimeout(fetchDecisions, 500);
+    } catch(e) { console.error(e); }
   };
 
-  const handleReject = (id: string, note: string) => {
-    setDecisions((prev) =>
-      prev.map((d) => d.id === id ? { ...d, status: "rejected", rejectionNote: note } : d)
-    );
+  const handleReject = async (id: string, note: string) => {
+    try {
+      await fetch(`/api/decisions/${id}/approve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedback: note })
+      });
+      setDecisions((prev) =>
+        prev.map((d) => d.id === id ? { ...d, status: "rejected", rejectionNote: note } : d)
+      );
+      // Refetch to ensure consistency
+      setTimeout(fetchDecisions, 500);
+    } catch(e) { console.error(e); }
   };
 
   const handleWorkspaceApprove = () => {
@@ -141,23 +212,49 @@ export default function App() {
     navigate("memory");
   };
 
-  const handleNewSubmission = (d: DecisionDraft) => {
-    const newDec: SharedDecision = {
-      id: `D-${2843 + decisions.length}`,
-      customer: d.entity,
-      context: d.entityType ?? "Discussion",
-      submittedBy: user?.name ?? "Unknown",
-      status: "submitted",
-      date: "Just now",
-      revenue: "TBD",
-      summary: d.notes.slice(0, 100) + (d.notes.length > 100 ? "…" : ""),
-      priority: "Medium",
-      scenarioId: d.scenarioId,
-    };
-    setDecisions((prev) => [newDec, ...prev]);
-    // After submitting, show them the status view immediately
-    setActiveDecisionId(newDec.id);
-    setPage("submission-view");
+  const handleNewSubmission = async (d: DecisionDraft) => {
+    try {
+      const res = await fetch('/api/decisions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          context: d.notes,
+          entity: d.entity,
+          priority: "Medium"
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      
+      const newDec: SharedDecision = {
+        id: data.id,
+        customer: d.entity,
+        context: d.entityType ?? "Discussion",
+        submittedBy: user?.name ?? "Unknown",
+        status: data.status?.toLowerCase() === 'pending_review' ? 'in-review' : (data.status?.toLowerCase() || 'submitted'),
+        date: "Just now",
+        revenue: "TBD",
+        summary: d.notes.slice(0, 100) + (d.notes.length > 100 ? "…" : ""),
+        priority: "Medium",
+        scenarioId: data.id,
+        // @ts-ignore
+        strategies: data.strategies
+      };
+      setDecisions((prev) => [newDec, ...prev]);
+      setActiveDecisionId(newDec.id);
+      if (user?.role !== "architect") {
+        setPage("submission-view");
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(`Failed to submit decision: ${e.message}`);
+      throw e; // Rethrow so DecisionsPage can catch it
+    }
   };
 
   if (!user) {

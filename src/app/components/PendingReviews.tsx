@@ -118,8 +118,12 @@ export function PendingReviews({ decisions, onApprove, onReject, onOpenWorkspace
           const dec = decisions.find((d) => d.id === expanded);
           if (!dec) return null;
           
-          const scenario = DEMO_SCENARIOS.find(s => s.id === dec.scenarioId) ?? DEMO_SCENARIOS[0];
-          const strategies = scenario.strategies.map(s => s.title);
+          const realStrategies = (dec as any).strategies || [];
+          const hasRealStrategies = realStrategies.length > 0;
+          const strategies = hasRealStrategies
+            ? realStrategies.map((s: any) => s.title)
+            : (DEMO_SCENARIOS.find(s => s.id === dec.scenarioId) ?? DEMO_SCENARIOS[0]).strategies.map(s => s.title);
+            
           const isApproved = approvedIds.includes(dec.id);
           const isRejecting = rejectingId === dec.id;
 
@@ -140,67 +144,24 @@ export function PendingReviews({ decisions, onApprove, onReject, onOpenWorkspace
 
               {/* AI Analysis output */}
               <div className="space-y-4 mb-6">
-                <AnalysisCard title="Business Summary">
-                  <p className="text-sm leading-relaxed" style={{ color: "#374151" }}>
-                    {scenario.notes}
-                  </p>
-                </AnalysisCard>
-
-                <AnalysisCard title="Possible Decision Identified">
+                <AnalysisCard title="AI Strategy Identified">
                   <div className="rounded-xl p-4" style={{ background: "#f0f0f8", border: "1px solid #ddddf0" }}>
                     <p className="font-semibold" style={{ color: "#1a1a2e" }}>
-                      {scenario.strategies[0]?.description ?? "Immediate executive engagement required."}
+                      {hasRealStrategies ? realStrategies[0]?.description : "Immediate executive engagement required."}
                     </p>
                   </div>
                 </AnalysisCard>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <AnalysisCard title="Evidence Used">
-                    {scenario.evidence.slice(0, 4).map((e) => (
-                      <div key={e} className="flex items-center gap-2 mb-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#059669" }} />
-                        <span className="text-xs" style={{ color: "#374151" }}>{e}</span>
-                      </div>
-                    ))}
-                    {scenario.evidence.length === 0 && (
-                      <p className="text-xs" style={{ color: "#6b6b80" }}>No evidence explicitly attached.</p>
-                    )}
-                  </AnalysisCard>
-                  <AnalysisCard title="Missing Information">
-                    {scenario.questions.slice(0, 3).map((m) => (
-                      <div key={m} className="flex items-center gap-2 mb-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
-                        <span className="text-xs" style={{ color: "#374151" }}>{m}</span>
-                      </div>
-                    ))}
-                    {scenario.questions.length === 0 && (
-                      <p className="text-xs" style={{ color: "#6b6b80" }}>No missing information detected.</p>
-                    )}
-                  </AnalysisCard>
-                </div>
-
-                {/* Similar decisions */}
-                <AnalysisCard title={`${scenario.history.length > 0 ? scenario.history.length : '3'} Similar Cases Found`}>
-                  <div className="space-y-2">
-                    {scenario.history.length > 0 ? scenario.history.map((c, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#059669" }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium" style={{ color: "#1a1a2e" }}>{c.action}</div>
-                        </div>
-                        <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#059669" }}>{c.outcome}</span>
-                      </div>
-                    )) : (
-                      <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "#f7f7f9" }}>
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#059669" }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium" style={{ color: "#1a1a2e" }}>Standard Process Executed</div>
-                        </div>
-                        <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#059669" }}>Successful</span>
-                      </div>
-                    )}
+                
+                {hasRealStrategies && realStrategies[0]?.impact && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <AnalysisCard title="Impact">
+                       <p className="text-sm" style={{ color: "#374151" }}>{realStrategies[0].impact}</p>
+                    </AnalysisCard>
+                    <AnalysisCard title="Risk">
+                       <p className="text-sm" style={{ color: "#374151" }}>{realStrategies[0].risk}</p>
+                    </AnalysisCard>
                   </div>
-                </AnalysisCard>
+                )}
               </div>
 
               {/* Strategy selection + approve */}

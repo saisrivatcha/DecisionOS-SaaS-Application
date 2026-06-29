@@ -50,7 +50,7 @@ const pipelineSteps = [
 ];
 
 interface DecisionsPageProps {
-  onSubmit: (draft: DecisionDraft) => void;
+  onSubmit: (draft: DecisionDraft) => Promise<void> | void;
 }
 
 export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
@@ -72,38 +72,52 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
   const [pipelineStep, setPipelineStep] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer.files) {
+      setFiles((p) => [...p, ...Array.from(e.dataTransfer.files)]);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     setStage("processing");
   };
 
-  /* Pipeline animation */
   useEffect(() => {
     if (stage !== "processing") return;
+    
+    let isSubscribed = true;
+
     if (pipelineStep >= pipelineSteps.length - 1) {
-      setTimeout(() => setStage("done"), 500);
+      // Execute API call while on the last step
+      Promise.resolve(onSubmit({
+        entity: entityName || entityType || "Unknown",
+        entityType: decisionType ?? entityType ?? "Discussion",
+        notes: summary,
+        isNew: true,
+        scenarioId: scenarioId ?? undefined,
+      })).then(() => {
+        if (isSubscribed) setStage("done");
+      }).catch((e) => {
+        console.error(e);
+        if (isSubscribed) setStage("idle");
+      });
       return;
     }
-    const delay = pipelineStep === 0 ? 600 : pipelineStep <= 2 ? 900 : 1100;
-    const t = setTimeout(() => setPipelineStep((s) => s + 1), delay);
-    return () => clearTimeout(t);
-  }, [stage, pipelineStep]);
 
-  useEffect(() => {
-    if (stage === "done") {
-      const t = setTimeout(() => {
-        onSubmit({
-          entity: entityName || entityType || "Unknown",
-          entityType: decisionType ?? entityType ?? "Discussion",
-          notes: summary,
-          isNew: true,
-          scenarioId: scenarioId ?? undefined,
-        });
-      }, 700);
-      return () => clearTimeout(t);
-    }
-  }, [stage]);
+    const delay = pipelineStep === 0 ? 600 : pipelineStep <= 2 ? 900 : 1100;
+    const t = setTimeout(() => {
+      if (isSubscribed) setPipelineStep((s) => s + 1);
+    }, delay);
+    
+    return () => {
+      isSubscribed = false;
+      clearTimeout(t);
+    };
+  }, [stage, pipelineStep, onSubmit, entityName, entityType, decisionType, summary, scenarioId]);
 
   const canGoStep2 = !!entityType && entityName.trim().length > 0 && !!decisionType;
   const canSubmit  = summary.trim().length > 10;
@@ -294,7 +308,7 @@ export function DecisionsPage({ onSubmit }: DecisionsPageProps) {
             )}
 
             {/* Decision type */}
-            {entityType && entityName.length > 0 && (
+            {entityType && (
               <div className="mb-6">
                 <label className="block text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#a0a0b0" }}>
                   Decision Type
